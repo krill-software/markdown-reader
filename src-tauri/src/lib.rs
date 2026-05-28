@@ -1,6 +1,20 @@
+mod watch;
+
 use std::path::PathBuf;
+use std::sync::Arc;
+
+use tauri::{AppHandle, State};
+use tokio::sync::Mutex;
 
 use krill_desktop_core::{fs as kfs, updater::BuilderExt};
+
+#[derive(Default)]
+struct AppCtx {
+    /// Active file watcher, if any. Dropping it stops the watch.
+    /// Held in an Option so opening a new file can swap atomically:
+    /// drop the old watcher, install the new one.
+    watch: Mutex<Option<watch::Watch>>,
+}
 
 #[tauri::command]
 fn read_md(path: String) -> Result<String, String> {
@@ -11,6 +25,28 @@ fn read_md(path: String) -> Result<String, String> {
 #[tauri::command]
 fn absolute_path(path: String) -> String {
     kfs::absolute_path(std::path::Path::new(&path))
+}
+
+#[tauri::command]
+async fn watch_file(
+    path: String,
+    app: AppHandle,
+    state: State<'_, Arc<AppCtx>>,
+) -> Result<(), String> {
+    // Drop any previous watcher *before* starting the new one so we
+    // never have two notifying about old + new paths simultaneously.
+    let mut g = state.watch.lock().await;
+    *g = None;
+    let w = watch::start(std::path::Path::new(&path), app)
+        .map_err(|e| format!("{e:#}"))?;
+    *g = Some(w);
+    Ok(())
+}
+
+#[tauri::command]
+async fn stop_watching(state: State<'_, Arc<AppCtx>>) -> Result<(), String> {
+    *state.watch.lock().await = None;
+    Ok(())
 }
 
 /// Dev convenience: returns the path to a test fixture if present so
@@ -28,7 +64,9 @@ fn dev_test_file() -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let ctx = Arc::new(AppCtx::default());
     tauri::Builder::default()
+        .manage(ctx)
         .with_updater()
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_dialog::init())
@@ -36,6 +74,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_md,
             absolute_path,
+            watch_file,
+            stop_watching,
             dev_test_file,
         ])
         .run(tauri::generate_context!())

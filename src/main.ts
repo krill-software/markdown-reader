@@ -4,6 +4,7 @@ import "highlight.js/styles/github.css";
 import "./styles.css";
 import { mountChrome, showBootError, checkForUpdates } from "@krill-software/desktop-ui";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getMatches } from "@tauri-apps/plugin-cli";
@@ -252,7 +253,6 @@ function renderEmpty() {
 function renderCurrent() {
   if (!currentPath) { renderEmpty(); return; }
   renderRoot.innerHTML = renderMarkdown(currentSource);
-  renderRoot.scrollTop = 0;
   void renderMermaidBlocks(renderRoot);
 }
 
@@ -268,6 +268,14 @@ async function openPath(path: string) {
     document.title = title;
     void getCurrentWindow().setTitle(title).catch(() => {});
     renderCurrent();
+    mainContentEl.scrollTop = 0;
+    // Start watching the new file. Backend drops the previous watcher
+    // so swapping files doesn't leak listeners.
+    try {
+      await invoke("watch_file", { path: abs });
+    } catch (e) {
+      console.warn("watch_file failed (live updates disabled):", e);
+    }
   } catch (e) {
     console.error("openPath failed:", e);
     renderRoot.replaceChildren();
@@ -277,6 +285,33 @@ async function openPath(path: string) {
     err.append(el("p", { class: "mono" }, String(e)));
     renderRoot.append(err);
   }
+}
+
+// Live re-render path. Debounced: editors often save in bursts (atomic
+// rename produces multiple notify events in quick succession), and we
+// want exactly one re-fetch per quiet period.
+let reloadTimer: number | null = null;
+async function scheduleReload() {
+  if (reloadTimer != null) {
+    clearTimeout(reloadTimer);
+  }
+  reloadTimer = window.setTimeout(async () => {
+    reloadTimer = null;
+    if (!currentPath) return;
+    try {
+      const text = await invoke<string>("read_md", { path: currentPath });
+      if (text === currentSource) return; // no-op if nothing actually changed
+      currentSource = text;
+      const top = mainContentEl.scrollTop;
+      renderCurrent();
+      // Best-effort scroll preservation. Edits above the viewport
+      // shift things and there's no anchor to fix it; this at least
+      // keeps you near where you were.
+      mainContentEl.scrollTop = top;
+    } catch (e) {
+      console.warn("reload failed (file may have been removed):", e);
+    }
+  }, 80);
 }
 
 async function openViaDialog() {
@@ -331,6 +366,14 @@ async function boot() {
   applyTypography();
   renderAux();
   renderEmpty();
+
+  // Live re-renders on file change. Path filtering happens here too:
+  // the backend already filters, but if we ever watch multiple files
+  // this gate becomes useful.
+  await listen<string>("file-changed", (e) => {
+    if (!currentPath || e.payload !== currentPath) return;
+    void scheduleReload();
+  });
 
   await installDragDrop();
 
