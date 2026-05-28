@@ -189,7 +189,11 @@ function buildControlGroup(
   const wrap = el("div", { class: "type-group" });
   wrap.append(el("div", { class: "type-label" }, label));
 
-  // Font picker
+  const row = el("div", { class: "type-row" });
+
+  // Font picker — `appearance: none` strips the system chevron; the
+  // chevron in styles.css is a CSS background-image so it picks up
+  // the palette.
   const fontSel = el("select", { class: "type-select" }) as HTMLSelectElement;
   for (const f of FONTS) {
     const opt = el("option", { value: f.label }, f.label) as HTMLOptionElement;
@@ -203,34 +207,40 @@ function buildControlGroup(
     fontSel.style.fontFamily = FONTS.find(f => f.label === fontSel.value)?.css ?? "";
     applyTypography();
   });
-  wrap.append(fontSel);
+  row.append(fontSel);
 
-  // Size stepper
-  const sizeWrap = el("div", { class: "type-size" });
-  const minus = el("button", { class: "type-step", type: "button" }, "−");
+  // Size — compact input with embedded "px" unit, to the right of
+  // the font select on the same row.
+  const min = label === "Heading" ? 12 : 10;
+  const max = label === "Heading" ? 64 : 32;
+  const sizeBox = el("div", { class: "type-size-box" });
   const sizeNum = el("input", {
     class: "type-size-input",
     type: "number",
-    min: label === "Heading" ? "12" : "10",
-    max: label === "Heading" ? "64" : "32",
+    min: String(min),
+    max: String(max),
     value: String(typography[sizeKey]),
   }) as HTMLInputElement;
-  const plus = el("button", { class: "type-step", type: "button" }, "+");
+  const unit = el("span", { class: "type-unit" }, "px");
   const commitSize = (n: number) => {
-    const clamped = Math.max(
-      label === "Heading" ? 12 : 10,
-      Math.min(label === "Heading" ? 64 : 32, n),
-    );
+    const clamped = Math.max(min, Math.min(max, n));
     typography[sizeKey] = clamped;
     sizeNum.value = String(clamped);
     applyTypography();
   };
-  minus.addEventListener("click", () => commitSize(typography[sizeKey] - 1));
-  plus.addEventListener("click", () => commitSize(typography[sizeKey] + 1));
-  sizeNum.addEventListener("change", () => commitSize(parseInt(sizeNum.value, 10) || typography[sizeKey]));
-  sizeWrap.append(minus, sizeNum, plus, el("span", { class: "type-unit" }, "px"));
-  wrap.append(sizeWrap);
+  sizeNum.addEventListener("change", () =>
+    commitSize(parseInt(sizeNum.value, 10) || typography[sizeKey]),
+  );
+  // Scroll-wheel to nudge — quiet but discoverable.
+  sizeNum.addEventListener("wheel", (e) => {
+    if (document.activeElement !== sizeNum) return;
+    e.preventDefault();
+    commitSize(typography[sizeKey] + (e.deltaY < 0 ? 1 : -1));
+  }, { passive: false });
+  sizeBox.append(sizeNum, unit);
+  row.append(sizeBox);
 
+  wrap.append(row);
   return wrap;
 }
 
