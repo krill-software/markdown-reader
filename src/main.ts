@@ -36,7 +36,7 @@ const FONTS: FontChoice[] = [
   { label: "system-ui",       css: 'system-ui, -apple-system, sans-serif' },
 ];
 
-const DEFAULTS = {
+const DEFAULTS: Typography = {
   headingFont: "Charter",
   headingSize: 28,
   bodyFont: "Inter",
@@ -172,7 +172,7 @@ function renderAux() {
   const reset = el("button", { class: "type-reset", type: "button" }, "Reset to defaults");
   reset.addEventListener("click", () => {
     typography = { ...DEFAULTS };
-    applyTypography();
+    applyAndPersist();
     renderAux();
   });
   section.append(reset);
@@ -205,7 +205,7 @@ function buildControlGroup(
   fontSel.addEventListener("change", () => {
     typography[fontKey] = fontSel.value;
     fontSel.style.fontFamily = FONTS.find(f => f.label === fontSel.value)?.css ?? "";
-    applyTypography();
+    applyAndPersist();
   });
   row.append(fontSel);
 
@@ -226,7 +226,7 @@ function buildControlGroup(
     const clamped = Math.max(min, Math.min(max, n));
     typography[sizeKey] = clamped;
     sizeNum.value = String(clamped);
-    applyTypography();
+    applyAndPersist();
   };
   sizeNum.addEventListener("change", () =>
     commitSize(parseInt(sizeNum.value, 10) || typography[sizeKey]),
@@ -251,6 +251,27 @@ function applyTypography() {
   renderRoot.style.setProperty("--mv-body-font",    bf);
   renderRoot.style.setProperty("--mv-heading-size", `${typography.headingSize}px`);
   renderRoot.style.setProperty("--mv-body-size",    `${typography.bodySize}px`);
+}
+
+/// Apply + persist. Call from user-driven change handlers; boot just
+/// uses applyTypography() so we don't write back what we just loaded.
+function applyAndPersist() {
+  applyTypography();
+  schedulePersist();
+}
+
+// Debounced settings save. The size stepper can fire 10+ times in
+// quick succession (scroll wheel, +/- holding) — one disk write per
+// settled value is plenty.
+let persistTimer: number | null = null;
+function schedulePersist() {
+  if (persistTimer != null) clearTimeout(persistTimer);
+  persistTimer = window.setTimeout(() => {
+    persistTimer = null;
+    invoke("save_settings", { settings: typography }).catch((e) =>
+      console.warn("save_settings failed:", e),
+    );
+  }, 250);
 }
 
 // ---- Main pane: render the current document ------------------------
@@ -378,6 +399,14 @@ async function boot() {
   mainContentEl.append(renderRoot);
   viewportEl.replaceChildren(topbar, mainContentEl);
 
+  // Load persisted typography choices, if any. Falls back to defaults
+  // when the file is missing or malformed.
+  try {
+    const loaded = await invoke<Typography>("load_settings");
+    typography = { ...DEFAULTS, ...loaded };
+  } catch (e) {
+    console.warn("load_settings failed:", e);
+  }
   applyTypography();
   renderAux();
   renderEmpty();
