@@ -43,15 +43,6 @@ body {
   flex-direction: column;
 }
 
-.aux-version {
-  padding: 8px 12px 10px;
-  font-size: 11px;
-  color: var(--fm-muted);
-  text-align: center;
-  font-feature-settings: "tnum" 1;
-  margin-top: auto;
-}
-
 /* === Typography controls (sidebar) =============================== */
 
 .type-controls {

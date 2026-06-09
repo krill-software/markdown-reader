@@ -96,7 +96,6 @@ function renderAux() {
   // The aux strip (hamburger) is owned by desktop-ui's app layout — leave it
   // in place and re-render only our own content below it.
   auxEl.querySelector(".type-controls")?.remove();
-  auxEl.querySelector(".aux-version")?.remove();
 
   const section = el("div", { class: "type-controls" });
   section.append(el("h2", { class: "type-section" }, "Typography"));
@@ -113,7 +112,6 @@ function renderAux() {
   section.append(reset);
 
   auxEl.append(section);
-  auxEl.append(el("div", { class: "aux-version" }, `v${__APP_VERSION__}`));
 }
 
 function buildControlGroup(
