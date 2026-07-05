@@ -38,7 +38,7 @@ pub fn state_dir() -> PathBuf {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("state")))
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("krill-markdown-viewer")
+        .join("krill-markdown-reader")
 }
 
 fn settings_path() -> PathBuf {
@@ -49,7 +49,7 @@ pub fn load() -> Settings {
     let path = settings_path();
     let Ok(bytes) = std::fs::read(&path) else { return Settings::default() };
     serde_json::from_slice(&bytes).unwrap_or_else(|e| {
-        eprintln!("[markdown-viewer] settings.json malformed: {e:?}");
+        eprintln!("[markdown-reader] settings.json malformed: {e:?}");
         Settings::default()
     })
 }

@@ -1,29 +1,29 @@
-# Markdown Viewer — Spec (v1)
+# Markdown Reader — Spec (v1)
 
 A minimal Linux markdown reader. Open an `.md` file, see it rendered,
-pick the typography you want. The viewer watches the file so saves in
+pick the typography you want. The reader watches the file so saves in
 any external editor (vim, markdown-editor, VS Code…) update the
 render live. The reader's output is **your document**, not ours —
 the two font knobs let you make it look the way you want.
 
 ## In one sentence
 
-**A markdown viewer with live file watch and the two typography
+**A markdown reader with live file watch and the two typography
 knobs the rendered document needs to feel like yours.**
 
 ## Identity
 
 | Where                | Value                                            |
 |----------------------|--------------------------------------------------|
-| Slug                 | `markdown-viewer`                                |
-| Binary               | `krill-markdown-viewer`                          |
-| Cargo package        | `krill-markdown-viewer`                          |
-| Cargo lib            | `krill_markdown_viewer_lib`                      |
-| `package.json` name  | `krill-markdown-viewer`                          |
-| Bundle identifier    | `software.krill.markdown-viewer`                 |
-| productName          | `Markdown Viewer`                                |
-| State dir            | `$XDG_STATE_HOME/krill-markdown-viewer/`         |
-| GitHub repo          | `krill-software/markdown-viewer`                 |
+| Slug                 | `markdown-reader`                                |
+| Binary               | `krill-markdown-reader`                          |
+| Cargo package        | `krill-markdown-reader`                          |
+| Cargo lib            | `krill_markdown_reader_lib`                      |
+| `package.json` name  | `krill-markdown-reader`                          |
+| Bundle identifier    | `software.krill.markdown-reader`                 |
+| productName          | `Markdown Reader`                                |
+| State dir            | `$XDG_STATE_HOME/krill-markdown-reader/`         |
+| GitHub repo          | `krill-software/markdown-reader`                 |
 | Lucide icon          | `book-open`                                      |
 
 ## Why split it off from markdown-editor
@@ -39,17 +39,17 @@ real character. Letting the editor sprawl into typography
 configuration would re-pollute the very surface we kept clean.
 
 Splitting solves both: the editor stays opinionated and quiet, the
-viewer carries the two knobs that genuinely matter for output
+reader carries the two knobs that genuinely matter for output
 (heading font + body font, plus their sizes).
 
 ## Hard scope — the typography surface stays bounded
 
-This is the krill-uncomfortable part of the SPEC. The viewer **must**
+This is the krill-uncomfortable part of the SPEC. The reader **must**
 ship with only **four** typography controls, ever:
 
-- **Heading font** — picked from a curated list (~8 options)
+- **Heading font** — picked from a curated list (the bundled faces)
 - **Heading size** — number input or stepper
-- **Body font** — picked from a curated list (~8 options)
+- **Body font** — picked from a curated list (the bundled faces)
 - **Body size** — number input or stepper
 
 Anything else (weights, line-height, margins, code font, blockquote
@@ -64,28 +64,27 @@ not introduce additional knobs.
 
 ## Curated font list
 
-Bundled or system-safe choices, chosen to span styles people actually
-want for documents:
+The three faces desktop-ui bundles as woff2 — one per category, so a
+serif / sans / mono choice is always available and always renders
+crisply, whatever the user's Linux box has installed:
 
-- **Source Serif 4** (krill default; transitional serif)
-- **Inter** (krill default; humanist sans)
-- **JetBrains Mono** (krill default; mono)
-- **Charter** (old-style serif, often pre-installed)
-- **Georgia** (old-style serif, ubiquitous)
-- **Times New Roman** (classical serif)
-- **Helvetica** (geometric sans)
-- **system-ui** (whatever the user's OS picks)
+- **Charter** (krill default heading; old-style serif)
+- **Inter** (krill default body; humanist sans)
+- **JetBrains Mono** (mono)
 
-Both pickers offer the same eight options. The heading and body can
-be the same font (sometimes you want that). System fallbacks at the
-CSS level so missing fonts degrade quietly to the next stack entry.
+Both pickers offer the same three options. The heading and body can be
+the same font (sometimes you want that). We deliberately don't offer
+Windows/Mac faces (Georgia, Times New Roman, Helvetica, Arial): they
+aren't present on stock Linux and would silently degrade to Liberation,
+so the label would lie about what you're seeing. CSS fallback chains
+remain only as a last resort if a bundled face ever fails to load.
 
 ## Architecture
 
 ### Shell-family layout
 
 ```
-+--- Markdown Viewer ---------------------------------------------+
++--- Markdown Reader ---------------------------------------------+
 | [☰]                                                  ─ □ ✕     |
 +------------+----------------------------------------------------+
 |            |                                                    |
@@ -121,12 +120,12 @@ No file list / recents / favorites in v1. One window = one file.
 ### File handling
 
 - **Open** (`Ctrl+O`): file dialog filtered to `.md`
-- **CLI**: `krill-markdown-viewer path/to/file.md` opens that file
+- **CLI**: `krill-markdown-reader path/to/file.md` opens that file
 - **Drag-drop**: drop a `.md` onto the window
 - **File association**: `.md` registered as a candidate handler
   (alongside markdown-editor — Linux's "Open with…" picks between
   them; user chooses default)
-- **No save / no edit** — strictly a viewer
+- **No save / no edit** — strictly a reader
 
 ### File watching for live updates
 
@@ -140,7 +139,7 @@ On every change event:
 The watch is debounced at 80ms so a rapid save burst (text editors
 sometimes do atomic-rename which fires multiple events) renders once.
 
-The viewer makes no assumption about *which* editor wrote the file.
+The reader makes no assumption about *which* editor wrote the file.
 It works equally well with markdown-editor, vim, VS Code, or echoing
 into the file from a script.
 
@@ -155,7 +154,7 @@ Inherit the entire pipeline from markdown-editor's `preview.ts`:
 - Mermaid for `\`\`\`mermaid` blocks, lazy-loaded
 - Front-matter rendered as a `<pre>` block at the top of the document
 
-No reason for the viewer to render less than the editor's preview —
+No reason for the reader to render less than the editor's preview —
 that'd be a regression. The renderer code can either be lifted
 verbatim or extracted into a small shared package later.
 
@@ -172,7 +171,7 @@ verbatim or extracted into a small shared package later.
 
 ## What v1 is *not*
 
-- **No editing.** It's a viewer. Period.
+- **No editing.** It's a reader. Period.
 - **No multi-document tabs.** One window per file (krill rule).
 - **No export to HTML / PDF.** Deferred — easy to add later as a
   menu action that respects the live typography choices.
@@ -191,9 +190,9 @@ verbatim or extracted into a small shared package later.
   flow.
 - **Outline / TOC overlay** — could surface in a popover or a brief
   overlay, *not* as a permanent panel — preserves the calm.
-- **Linked viewer mode** — markdown-editor could spawn a viewer
+- **Linked reader mode** — markdown-editor could spawn a reader
   pointed at the file currently being edited via a small action
-  (`Ctrl+Shift+P`). Editor stays uncoupled (just shells out), viewer
+  (`Ctrl+Shift+P`). Editor stays uncoupled (just shells out), reader
   doesn't know about the editor — the watch handles synchronization.
 
 ## Stack

@@ -9,7 +9,7 @@ jobs:
   release:
     uses: krill-software/.github/.github/workflows/krill-app-release.yml@main
     with:
-      product-name: "Markdown Viewer"
+      product-name: "Markdown Reader"
       example-file: "notes.md"
     secrets: inherit
     permissions:

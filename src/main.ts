@@ -13,27 +13,22 @@ import { icons as lucideIcons, createElement as createLucide } from "lucide";
 
 import { renderMarkdown, renderMermaidBlocks } from "./preview";
 
-// ---- Curated font list — same 8 for headings and body. -------------
+// ---- Curated font list — same faces for headings and body. ---------
 //
 // Each entry is (label shown to user, CSS font-family value with
-// fallbacks). Anything in the user's system that doesn't have the
-// chosen face degrades down the fallback chain quietly.
+// fallbacks). We offer only the three faces desktop-ui bundles as
+// woff2, so every option renders crisply on any Linux box regardless
+// of what's installed system-wide — one serif, one sans, one mono.
+// (Windows/Mac faces like Georgia or Helvetica aren't present on stock
+// Linux and would silently degrade to Liberation, so they're not
+// offered.) The fallback chains only matter as a last resort if a
+// bundled face ever fails to load.
 
 interface FontChoice { label: string; css: string }
-// All choices fall back through reasonable system substitutes so a
-// missing face never collapses to DejaVu. The first three are bundled
-// as woff2 (bundled by desktop-ui) and always render
-// crisply; the rest rely on the user's system having them (or a
-// reasonable substitute).
 const FONTS: FontChoice[] = [
-  { label: "Charter",         css: '"Charter", Georgia, "Times New Roman", serif' },
-  { label: "Inter",           css: '"Inter", system-ui, -apple-system, sans-serif' },
+  { label: "Charter",        css: '"Charter", Georgia, serif' },
+  { label: "Inter",          css: '"Inter", system-ui, sans-serif' },
   { label: "JetBrains Mono", css: '"JetBrains Mono", ui-monospace, monospace' },
-  { label: "Georgia",         css: 'Georgia, "Times New Roman", serif' },
-  { label: "Times New Roman", css: '"Times New Roman", Times, serif' },
-  { label: "Helvetica",       css: 'Helvetica, "Liberation Sans", Arial, sans-serif' },
-  { label: "Arial",           css: 'Arial, "Liberation Sans", sans-serif' },
-  { label: "system-ui",       css: 'system-ui, -apple-system, sans-serif' },
 ];
 
 const DEFAULTS: Typography = {
@@ -233,7 +228,7 @@ async function openPath(path: string) {
     const text = await invoke<string>("read_md", { path: abs });
     currentPath = abs;
     currentSource = text;
-    const title = `${basename(abs)} — Markdown Viewer`;
+    const title = `${basename(abs)} — Markdown Reader`;
     document.title = title;
     void getCurrentWindow().setTitle(title).catch(() => {});
     renderCurrent();
@@ -311,7 +306,7 @@ async function installDragDrop() {
 
 async function boot() {
   const chrome = mountChrome({
-    productName: "Markdown Viewer",
+    productName: "Markdown Reader",
     version: __APP_VERSION__,
     layout: "app",
     showAuxPane: true,
@@ -337,6 +332,13 @@ async function boot() {
   } catch (e) {
     console.warn("load_settings failed:", e);
   }
+  // An older settings file may name a font we no longer offer (the list
+  // was trimmed to the bundled faces). Fall back to the default so we
+  // never hand applyTypography an empty family string.
+  if (!FONTS.some(f => f.label === typography.headingFont))
+    typography.headingFont = DEFAULTS.headingFont;
+  if (!FONTS.some(f => f.label === typography.bodyFont))
+    typography.bodyFont = DEFAULTS.bodyFont;
   applyTypography();
   renderAux();
   renderEmpty();

@@ -1,4 +1,4 @@
-/* markdown-viewer — app-specific styles. Palette, fonts, and chrome (the
+/* markdown-reader — app-specific styles. Palette, fonts, and chrome (the
  * app layout: in-viewport top bars, hamburger menu, no titlebar / status
  * line) all come from @krill-software/desktop-ui via mountChrome({ layout:
  * "app" }). This file carries only the app's own surfaces: the sidebar
@@ -226,14 +226,19 @@ body {
 /* === Rendered document =========================================== */
 
 .render {
-  --mv-heading-font: "Charter", Georgia, "Times New Roman", serif;
+  --mv-heading-font: "Charter", Georgia, serif;
   --mv-body-font: "Inter", system-ui, sans-serif;
   --mv-heading-size: 28px;
   --mv-body-size: 16px;
 
-  max-width: 70ch;
+  /* Two widths: a readable prose measure for text, and a wider outer
+   * column that wide blocks (tables, code, images, diagrams) fill so
+   * they aren't crammed. See the prose-cap rule below. */
+  --mv-measure: 78ch;
+
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 48px 32px 96px;
+  padding: 48px 40px 96px;
   color: var(--fm-text);
   font-family: var(--mv-body-font);
   font-size: var(--mv-body-size);
@@ -245,6 +250,22 @@ body {
     "kern" 1,
     "liga" 1,
     "calt" 1;
+}
+
+/* Keep running text at a comfortable measure even though the column is
+ * wide. Tables, code fences, images, rules and diagrams are deliberately
+ * left out so they span the full width instead of being crammed. */
+.render > p,
+.render > ul,
+.render > ol,
+.render > blockquote,
+.render > h1,
+.render > h2,
+.render > h3,
+.render > h4,
+.render > h5,
+.render > h6 {
+  max-width: var(--mv-measure);
 }
 
 .render h1,
@@ -341,15 +362,26 @@ body {
 .render table {
   border-collapse: collapse;
   width: 100%;
+  font-size: 0.92em;
+  line-height: 1.45;
 }
 .render th,
 .render td {
-  border-bottom: 1px solid var(--fm-rule);
-  padding: 6px 10px;
+  padding: 9px 14px;
   text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--fm-rule);
 }
-.render th {
+.render thead th {
   font-weight: 600;
+  color: var(--fm-text);
+  /* Ink at low alpha — a gentle header band, not a new colour. */
+  background: rgba(48, 52, 63, 0.04);
+  border-bottom: 1px solid var(--fm-rule-strong);
+}
+/* Drop the trailing rule so the table doesn't look unfinished. */
+.render tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .render img {

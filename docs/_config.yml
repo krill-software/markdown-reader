@@ -2,7 +2,7 @@ remote_theme: krill-software/docs-theme@v4.3
 plugins:
   - jekyll-remote-theme
 
-title: Markdown Viewer
-slug: markdown-viewer
-brand: markdown-viewer
+title: Markdown Reader
+slug: markdown-reader
+brand: markdown-reader
 version: 0.1.0

@@ -1,6 +1,6 @@
-# Markdown Viewer
+# Markdown Reader
 
-> A markdown viewer with live file watch and the two typography knobs
+> A markdown reader with live file watch and the two typography knobs
 > the rendered document needs to feel like yours.
 
 Part of the [krill](https://krill.software) umbrella of small, calm,
@@ -12,7 +12,7 @@ The editor is an **authoring** surface — typography there is locked
 on purpose. Calmness while writing is the point. But the **rendered
 output** is your artifact, not ours; you should be able to pick the
 typography it gets rendered with. Splitting solves both: editor stays
-opinionated, viewer carries the four knobs (heading font + size, body
+opinionated, reader carries the four knobs (heading font + size, body
 font + size) and nothing else.
 
 ## Status
