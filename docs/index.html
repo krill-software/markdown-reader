@@ -3,8 +3,6 @@ layout: app
 tagline: a calm live-reload markdown reader for Linux
 description: A quiet markdown reader for Linux. Live file watch, two typography knobs (heading + body), and the rendered output looks like your document — not ours.
 og_description: A quiet markdown reader for Linux. Free and open source.
-eyebrow: A markdown reader for Linux
-heading: "Render it, <em>read</em> it, edit it elsewhere."
 lede: A markdown reader that watches the file. Edit anywhere — vim, markdown-editor, VS Code — and the render updates the moment you save. Two typography knobs make the output look like your document.
 features_heading: Just a reader. A focused one.
 features:
@@ -44,7 +42,7 @@ mock:
   }
   .mv-aux {
     border-right: 1px solid var(--rule);
-    background: rgba(48, 52, 63, 0.03);
+    background: rgba(var(--ink-rgb), 0.03);
     padding: 10px 14px;
   }
   .mv-burger { color: var(--muted); font-size: 14px; padding: 2px 2px 14px; }
@@ -146,7 +144,7 @@ mock:
   .mv-doc code {
     font-family: var(--mono);
     font-size: 12px;
-    background: rgba(48, 52, 63, 0.05);
+    background: rgba(var(--ink-rgb), 0.05);
     padding: 1px 5px;
     border-radius: 3px;
   }
