@@ -78,15 +78,25 @@ function renderEmpty() {
   showPlaceholder(empty);
 }
 
-function renderCurrent(opts: { keepScroll?: boolean } = {}) {
+interface RenderOpts {
+  /** Stay where the reader is (live reload). */
+  keepScroll?: boolean;
+  /** Restore an exact scroll position (back / forward). */
+  scroll?: number;
+  /** Jump to a heading (a link like `other.md#setup`). */
+  fragment?: string;
+}
+
+function renderCurrent(opts: RenderOpts = {}) {
   if (!currentPath) { renderEmpty(); return; }
   const gen = ++renderGen;
-  const top = opts.keepScroll ? mainContentEl.scrollTop : 0;
+  const top = opts.scroll ?? (opts.keepScroll ? mainContentEl.scrollTop : 0);
   showPlaceholder(null);
   renderRoot.innerHTML = renderMarkdown(currentSource);
   softenTableCode(renderRoot);
   void renderMermaidBlocks(renderRoot);
   mainContentEl.scrollTop = top;
+  if (opts.fragment) scrollToFragment(opts.fragment);
   find.refresh();
   renderToc();
   // Column balancing needs real font metrics; redo it once fonts are in.
@@ -156,16 +166,19 @@ function toggleSidebar() {
 
 // ---- File I/O ------------------------------------------------------
 
-async function openPath(path: string) {
+/** Load a file into the window. Resolves false (and shows the error
+ *  page, leaving the current document loaded) when it can't be read. */
+async function openPath(path: string, opts: RenderOpts = {}): Promise<boolean> {
   try {
     const abs = await invoke<string>("absolute_path", { path });
     const text = await invoke<string>("read_md", { path: abs });
     currentPath = abs;
     currentSource = text;
+    errorReturn = null;
     const title = `${basename(abs)} — Markdown Reader`;
     document.title = title;
     void getCurrentWindow().setTitle(title).catch(() => {});
-    renderCurrent();
+    renderCurrent(opts);
     // Start watching the new file. Backend drops the previous watcher
     // so swapping files doesn't leak listeners.
     try {
@@ -173,6 +186,7 @@ async function openPath(path: string) {
     } catch (e) {
       console.warn("watch_file failed (live updates disabled):", e);
     }
+    return true;
   } catch (e) {
     console.error("openPath failed:", e);
     renderGen++;
@@ -181,7 +195,125 @@ async function openPath(path: string) {
     err.append(el("h2", {}, "Couldn't open this file"));
     err.append(el("p", { class: "mono" }, String(e)));
     showPlaceholder(err);
+    return false;
   }
+}
+
+// ---- History (back / forward) ---------------------------------------
+//
+// Following a link to another markdown file replaces the document in
+// this window; the stacks remember where the reader came from, scroll
+// position included.
+
+interface Stop { path: string; scroll: number }
+const backStack: Stop[] = [];
+const forwardStack: Stop[] = [];
+// Set while the error page covers a document that is still loaded (a
+// dead link): Back then just uncovers it at this scroll position.
+let errorReturn: number | null = null;
+let backBtn: HTMLButtonElement;
+let forwardBtn: HTMLButtonElement;
+
+function here(): Stop | null {
+  return currentPath ? { path: currentPath, scroll: mainContentEl.scrollTop } : null;
+}
+
+function updateNav() {
+  const canBack = backStack.length > 0 || errorReturn != null;
+  const canForward = forwardStack.length > 0;
+  // No history at all (the common single-document case): no buttons.
+  backBtn.hidden = forwardBtn.hidden = !canBack && !canForward;
+  backBtn.disabled = !canBack;
+  forwardBtn.disabled = !canForward;
+}
+
+/** Go to a document the reader asked for (link, Open, drop, CLI). */
+async function visit(path: string, fragment?: string) {
+  const from = here();
+  if (await openPath(path, { fragment })) {
+    if (from && from.path !== currentPath) {
+      backStack.push(from);
+      forwardStack.length = 0;
+    }
+  } else if (from) {
+    errorReturn = from.scroll;
+  }
+  updateNav();
+}
+
+async function travel(from: Stop[], to: Stop[]) {
+  const stop = from.pop();
+  const origin = here();
+  if (!stop || !origin) return;
+  if (await openPath(stop.path, { scroll: stop.scroll })) to.push(origin);
+  else errorReturn = origin.scroll;
+  updateNav();
+}
+
+async function goBack() {
+  if (errorReturn != null) {
+    const scroll = errorReturn;
+    errorReturn = null;
+    renderCurrent({ scroll });
+    updateNav();
+    return;
+  }
+  await travel(backStack, forwardStack);
+}
+async function goForward() {
+  if (errorReturn != null) return;
+  await travel(forwardStack, backStack);
+}
+
+// ---- Links -----------------------------------------------------------
+//
+// Nothing may navigate the webview itself — that would replace the app.
+// `#heading` scrolls, a relative link to a markdown file opens it here,
+// web / mail links go to the system handler, anything else is inert.
+
+function slug(text: string): string {
+  return text.trim().toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
+    .replace(/\s/g, "-");
+}
+
+function safeDecode(s: string): string {
+  try { return decodeURIComponent(s); } catch { return s; }
+}
+
+function scrollToFragment(fragment: string) {
+  const id = safeDecode(fragment);
+  const target =
+    renderRoot.querySelector<HTMLElement>(`[id="${CSS.escape(id)}"], a[name="${CSS.escape(id)}"]`) ??
+    Array.from(renderRoot.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"))
+      .find(h => slug(h.textContent ?? "") === id.toLowerCase());
+  target?.scrollIntoView({ block: "start", behavior: "auto" });
+}
+
+function onLinkClick(e: MouseEvent) {
+  const a = (e.target as Element | null)?.closest?.("a[href]");
+  if (!a || !renderRoot.contains(a)) return;
+  e.preventDefault();
+  const href = (a.getAttribute("href") ?? "").trim();
+  if (href.startsWith("#")) { scrollToFragment(href.slice(1)); return; }
+  if (/^(https?|mailto):/i.test(href)) {
+    void invoke("plugin:opener|open_url", { url: href })
+      .catch((err) => console.warn("open_url failed:", err));
+    return;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || !currentPath) return;
+  const hash = href.indexOf("#");
+  const rel = safeDecode((hash >= 0 ? href.slice(0, hash) : href).split("?")[0]);
+  if (!/\.(md|markdown)$/i.test(rel)) return;
+  const dir = currentPath.slice(0, currentPath.lastIndexOf("/"));
+  void visit(rel.startsWith("/") ? rel : `${dir}/${rel}`, hash >= 0 ? href.slice(hash + 1) : undefined);
+}
+
+function navButton(label: string, icon: string, action: () => void): HTMLButtonElement {
+  const btn = el("button", { class: "main-topbar-btn", type: "button", title: label, "aria-label": label });
+  btn.append(iconSvg(icon, 14));
+  btn.addEventListener("click", action);
+  return btn;
 }
 
 // Live re-render path. Debounced: editors often save in bursts (atomic
@@ -215,7 +347,7 @@ async function openViaDialog() {
     directory: false,
     filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
   });
-  if (typeof picked === "string") await openPath(picked);
+  if (typeof picked === "string") await visit(picked);
 }
 
 function basename(p: string): string {
@@ -228,7 +360,7 @@ async function installDragDrop() {
   await wv.onDragDropEvent(async (e) => {
     if (e.payload.type === "drop") {
       const path = e.payload.paths.find((p) => /\.(md|markdown)$/i.test(p));
-      if (path) await openPath(path);
+      if (path) await visit(path);
     }
   });
 }
@@ -244,6 +376,8 @@ async function boot() {
     actions: {
       "open": openViaDialog,
       "toggle-sidebar": toggleSidebar,
+      "back": goBack,
+      "forward": goForward,
     },
     customMenu: [
       { group: "edit", items: [{ label: "Find…", shortcut: "Ctrl+F", action: () => find.open() }] },
@@ -258,6 +392,16 @@ async function boot() {
   renderRoot = el("article", { class: "render" });
   placeholderEl = el("div", { class: "placeholder" });
   mainContentEl.append(renderRoot, placeholderEl);
+  renderRoot.addEventListener("click", onLinkClick);
+  renderRoot.addEventListener("auxclick", onLinkClick);
+
+  // Back / forward sit at the left of the main top bar, opposite the
+  // window controls; hidden until there is somewhere to go.
+  backBtn = navButton("Back (Alt+←)", "arrow-left", () => void goBack());
+  forwardBtn = navButton("Forward (Alt+→)", "arrow-right", () => void goForward());
+  forwardBtn.classList.add("nav-forward");
+  chrome.viewport.querySelector(".main-topbar")!.prepend(backBtn, forwardBtn);
+  updateNav();
   // The contents list scrolls in its own box below the (package-owned)
   // aux strip, so the hamburger stays put.
   tocEl = el("div", { class: "toc-list" });
@@ -305,7 +449,7 @@ async function boot() {
     const matches = await getMatches();
     const arg = matches.args.file?.value;
     if (typeof arg === "string" && arg.length > 0) {
-      await openPath(arg);
+      await visit(arg);
       opened = true;
     }
   } catch { /* cli plugin unavailable */ }
@@ -314,7 +458,7 @@ async function boot() {
   if (!opened && import.meta.env.DEV) {
     try {
       const dev = await invoke<string | null>("dev_test_file");
-      if (dev) await openPath(dev);
+      if (dev) await visit(dev);
     } catch { /* none */ }
   }
 }

@@ -364,6 +364,12 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* === Back / forward (main top bar) =============================== */
+
+.main-topbar-btn[hidden] { display: none; }
+/* Push the window controls back to the right edge. */
+.nav-forward { margin-right: auto; }
+
 /* === Find ========================================================= */
 
 #viewport { position: relative; }

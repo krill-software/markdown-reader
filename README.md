@@ -17,7 +17,8 @@ without either becoming a settings panel.
 ## Status
 
 Open a `.md` (CLI arg, dialog, drag-drop), live-reload on save, find
-in document, contents list in the sidebar.
+in document, contents list in the sidebar, relative links between
+documents with back / forward.
 
 ## License
 

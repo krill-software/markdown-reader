@@ -154,6 +154,12 @@ verbatim or extracted into a small shared package later.
 - Live update on file change (notify-based watch, 80ms debounce)
 - Contents (h1–h3) in the sidebar
 - Find in document (`Ctrl+F`, Enter / Shift+Enter cycle, Esc closes)
+- Links: a relative link to another markdown file opens it in the same
+  window (`other.md#heading` jumps to the heading); `#heading` scrolls;
+  web / mail links go to the system handler; anything else is inert.
+  Back / forward (`Alt+←` / `Alt+→`, arrows at the left of the main top
+  bar, hidden until there is history) retrace the path, scroll position
+  included
 - App-layout chrome (no titlebar, no status line)
 - Linux x86_64 · AppImage + .deb · in-app updater
 
@@ -201,6 +207,7 @@ verbatim or extracted into a small shared package later.
 - **M2 — File watching.** notify-based watcher, 80ms debounce.
   Re-renders on every save. Preserves scroll position. *(done)*
 - **M3 — Contents + find.** Sidebar contents list, `Ctrl+F`. *(done)*
+- **M3.5 — Links.** Follow relative markdown links, back / forward. *(done)*
 - **M4 — Polish + packaging.** Per-app docs landing page (rich style,
   chrome.css). README. AppImage + .deb. Updater wiring. Add card
   to org site.
