@@ -11,48 +11,21 @@ import { getMatches } from "@tauri-apps/plugin-cli";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { icons as lucideIcons, createElement as createLucide } from "lucide";
 
+import { installFind, type FindController } from "./find";
 import { renderMarkdown, renderMermaidBlocks } from "./preview";
-
-// ---- Curated font list — same faces for headings and body. ---------
-//
-// Each entry is (label shown to user, CSS font-family value with
-// fallbacks). We offer only the three faces desktop-ui bundles as
-// woff2, so every option renders crisply on any Linux box regardless
-// of what's installed system-wide — one serif, one sans, one mono.
-// (Windows/Mac faces like Georgia or Helvetica aren't present on stock
-// Linux and would silently degrade to Liberation, so they're not
-// offered.) The fallback chains only matter as a last resort if a
-// bundled face ever fails to load.
-
-interface FontChoice { label: string; css: string }
-const FONTS: FontChoice[] = [
-  { label: "Charter",        css: '"Charter", Georgia, serif' },
-  { label: "Inter",          css: '"Inter", system-ui, sans-serif' },
-  { label: "JetBrains Mono", css: '"JetBrains Mono", ui-monospace, monospace' },
-];
-
-const DEFAULTS: Typography = {
-  headingFont: "Charter",
-  headingSize: 28,
-  bodyFont: "Inter",
-  bodySize: 16,
-};
-
-interface Typography {
-  headingFont: string;
-  headingSize: number;
-  bodyFont: string;
-  bodySize: number;
-}
-let typography: Typography = { ...DEFAULTS };
+import { balanceTables, softenTableCode } from "./tables";
 
 // ---- App state ------------------------------------------------------
 
 let mainContentEl: HTMLElement;
-let auxEl: HTMLElement;
-let renderRoot: HTMLElement;
+let renderRoot: HTMLElement;      // the rendered article
+let placeholderEl: HTMLElement;   // empty / error state
+let tocEl: HTMLElement;           // table of contents in the aux pane
+let find: FindController;
+
 let currentPath: string | null = null;
 let currentSource: string = "";
+let renderGen = 0;                // invalidates in-flight async work
 
 // ---- Lucide ---------------------------------------------------------
 
@@ -85,139 +58,100 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-// ---- Sidebar (typography controls) ---------------------------------
-
-function renderAux() {
-  // The aux strip (hamburger) is owned by desktop-ui's app layout — leave it
-  // in place and re-render only our own content below it.
-  auxEl.querySelector(".type-controls")?.remove();
-
-  const section = el("div", { class: "type-controls" });
-  section.append(el("h2", { class: "type-section" }, "Typography"));
-
-  section.append(buildControlGroup("Heading", "headingFont", "headingSize"));
-  section.append(buildControlGroup("Body",    "bodyFont",    "bodySize"));
-
-  const reset = el("button", { class: "type-reset", type: "button" }, "Reset to defaults");
-  reset.addEventListener("click", () => {
-    typography = { ...DEFAULTS };
-    applyAndPersist();
-    renderAux();
-  });
-  section.append(reset);
-
-  auxEl.append(section);
-}
-
-function buildControlGroup(
-  label: string,
-  fontKey: "headingFont" | "bodyFont",
-  sizeKey: "headingSize" | "bodySize",
-): HTMLElement {
-  const wrap = el("div", { class: "type-group" });
-  wrap.append(el("div", { class: "type-label" }, label));
-
-  const row = el("div", { class: "type-row" });
-
-  // Font picker — `appearance: none` strips the system chevron; the
-  // chevron in styles.css is a CSS background-image so it picks up
-  // the palette.
-  const fontSel = el("select", { class: "type-select" }) as HTMLSelectElement;
-  for (const f of FONTS) {
-    const opt = el("option", { value: f.label }, f.label) as HTMLOptionElement;
-    if (f.label === typography[fontKey]) opt.selected = true;
-    opt.style.fontFamily = f.css;
-    fontSel.append(opt);
-  }
-  fontSel.style.fontFamily = FONTS.find(f => f.label === typography[fontKey])?.css ?? "";
-  fontSel.addEventListener("change", () => {
-    typography[fontKey] = fontSel.value;
-    fontSel.style.fontFamily = FONTS.find(f => f.label === fontSel.value)?.css ?? "";
-    applyAndPersist();
-  });
-  row.append(fontSel);
-
-  // Size — compact input with embedded "px" unit, to the right of
-  // the font select on the same row.
-  const min = label === "Heading" ? 12 : 10;
-  const max = label === "Heading" ? 64 : 32;
-  const sizeBox = el("div", { class: "type-size-box" });
-  const sizeNum = el("input", {
-    class: "type-size-input",
-    type: "number",
-    min: String(min),
-    max: String(max),
-    value: String(typography[sizeKey]),
-  }) as HTMLInputElement;
-  const unit = el("span", { class: "type-unit" }, "px");
-  const commitSize = (n: number) => {
-    const clamped = Math.max(min, Math.min(max, n));
-    typography[sizeKey] = clamped;
-    sizeNum.value = String(clamped);
-    applyAndPersist();
-  };
-  sizeNum.addEventListener("change", () =>
-    commitSize(parseInt(sizeNum.value, 10) || typography[sizeKey]),
-  );
-  // Scroll-wheel to nudge — quiet but discoverable.
-  sizeNum.addEventListener("wheel", (e) => {
-    if (document.activeElement !== sizeNum) return;
-    e.preventDefault();
-    commitSize(typography[sizeKey] + (e.deltaY < 0 ? 1 : -1));
-  }, { passive: false });
-  sizeBox.append(sizeNum, unit);
-  row.append(sizeBox);
-
-  wrap.append(row);
-  return wrap;
-}
-
-function applyTypography() {
-  const hf = FONTS.find(f => f.label === typography.headingFont)?.css ?? "";
-  const bf = FONTS.find(f => f.label === typography.bodyFont)?.css ?? "";
-  renderRoot.style.setProperty("--mv-heading-font", hf);
-  renderRoot.style.setProperty("--mv-body-font",    bf);
-  renderRoot.style.setProperty("--mv-heading-size", `${typography.headingSize}px`);
-  renderRoot.style.setProperty("--mv-body-size",    `${typography.bodySize}px`);
-}
-
-/// Apply + persist. Call from user-driven change handlers; boot just
-/// uses applyTypography() so we don't write back what we just loaded.
-function applyAndPersist() {
-  applyTypography();
-  schedulePersist();
-}
-
-// Debounced settings save. The size stepper can fire 10+ times in
-// quick succession (scroll wheel, +/- holding) — one disk write per
-// settled value is plenty.
-let persistTimer: number | null = null;
-function schedulePersist() {
-  if (persistTimer != null) clearTimeout(persistTimer);
-  persistTimer = window.setTimeout(() => {
-    persistTimer = null;
-    invoke("save_settings", { settings: typography }).catch((e) =>
-      console.warn("save_settings failed:", e),
-    );
-  }, 250);
-}
-
 // ---- Main pane: render the current document ------------------------
+
+function showPlaceholder(node: HTMLElement | null) {
+  placeholderEl.replaceChildren();
+  if (node) placeholderEl.append(node);
+  mainContentEl.dataset.state = node ? "placeholder" : "document";
+}
 
 function renderEmpty() {
   renderRoot.replaceChildren();
+  tocEl.replaceChildren();
+  tocEntries = [];
   const empty = el("div", { class: "empty-state" });
   empty.append(iconSvg("book-open", 56));
   empty.append(el("h2", {}, "Open a markdown file"));
   empty.append(el("p", {},
     "Drag a .md file onto the window, use Ctrl+O, or pass a path on the command line."));
-  renderRoot.append(empty);
+  showPlaceholder(empty);
 }
 
-function renderCurrent() {
+function renderCurrent(opts: { keepScroll?: boolean } = {}) {
   if (!currentPath) { renderEmpty(); return; }
+  const gen = ++renderGen;
+  const top = opts.keepScroll ? mainContentEl.scrollTop : 0;
+  showPlaceholder(null);
   renderRoot.innerHTML = renderMarkdown(currentSource);
+  softenTableCode(renderRoot);
   void renderMermaidBlocks(renderRoot);
+  mainContentEl.scrollTop = top;
+  find.refresh();
+  renderToc();
+  // Column balancing needs real font metrics; redo it once fonts are in.
+  void document.fonts.ready.then(() => { if (gen === renderGen) balanceTables(renderRoot); });
+}
+
+// ---- Table of contents (aux pane) -----------------------------------
+//
+// Built from the live headings (h1–h3) after each render. Click scrolls
+// to the heading; the entry whose heading was last scrolled past is
+// highlighted.
+
+interface TocEntry { el: HTMLElement; row: HTMLElement }
+let tocEntries: TocEntry[] = [];
+let activeToc = -1;
+
+function renderToc() {
+  tocEl.replaceChildren();
+  tocEntries = [];
+  activeToc = -1;
+  const heads = Array.from(renderRoot.querySelectorAll<HTMLElement>("h1, h2, h3"))
+    .filter(h => h.textContent!.trim().length > 0);
+  if (heads.length === 0) return;
+  // Indent relative to the shallowest level present, so a doc that
+  // starts at h2 doesn't sit one step in.
+  const min = Math.min(...heads.map(h => Number(h.tagName[1])));
+  const list = el("nav", { class: "toc", "aria-label": "Contents" });
+  for (const h of heads) {
+    const level = Number(h.tagName[1]) - min;
+    const row = el("button", { class: "toc-row", type: "button", "data-level": String(level) });
+    row.append(el("span", { class: "toc-text" }, h.textContent!.trim()));
+    row.addEventListener("click", () => {
+      h.scrollIntoView({ block: "start", behavior: "auto" });
+    });
+    list.append(row);
+    tocEntries.push({ el: h, row });
+  }
+  tocEl.append(list);
+  updateActiveToc();
+}
+
+// The active entry is the last heading whose top has scrolled past the
+// upper part of the viewport.
+function updateActiveToc() {
+  if (tocEntries.length === 0) return;
+  const view = mainContentEl.getBoundingClientRect();
+  const line = view.top + Math.min(120, view.height * 0.2);
+  let idx = 0;
+  for (let i = 0; i < tocEntries.length; i++) {
+    if (tocEntries[i].el.getBoundingClientRect().top <= line) idx = i;
+    else break;
+  }
+  if (idx === activeToc) return;
+  if (activeToc >= 0) delete tocEntries[activeToc].row.dataset.active;
+  activeToc = idx;
+  const row = tocEntries[idx].row;
+  row.dataset.active = "true";
+  row.scrollIntoView({ block: "nearest" });
+}
+
+// ---- Sidebar visibility --------------------------------------------
+
+function toggleSidebar() {
+  const visible = document.body.dataset.aux === "visible";
+  document.body.dataset.aux = visible ? "hidden" : "visible";
 }
 
 // ---- File I/O ------------------------------------------------------
@@ -232,7 +166,6 @@ async function openPath(path: string) {
     document.title = title;
     void getCurrentWindow().setTitle(title).catch(() => {});
     renderCurrent();
-    mainContentEl.scrollTop = 0;
     // Start watching the new file. Backend drops the previous watcher
     // so swapping files doesn't leak listeners.
     try {
@@ -242,12 +175,12 @@ async function openPath(path: string) {
     }
   } catch (e) {
     console.error("openPath failed:", e);
-    renderRoot.replaceChildren();
+    renderGen++;
     const err = el("div", { class: "empty-state error" });
     err.append(iconSvg("triangle-alert", 56));
     err.append(el("h2", {}, "Couldn't open this file"));
     err.append(el("p", { class: "mono" }, String(e)));
-    renderRoot.append(err);
+    showPlaceholder(err);
   }
 }
 
@@ -266,12 +199,10 @@ async function scheduleReload() {
       const text = await invoke<string>("read_md", { path: currentPath });
       if (text === currentSource) return; // no-op if nothing actually changed
       currentSource = text;
-      const top = mainContentEl.scrollTop;
-      renderCurrent();
       // Best-effort scroll preservation. Edits above the viewport
       // shift things and there's no anchor to fix it; this at least
       // keeps you near where you were.
-      mainContentEl.scrollTop = top;
+      renderCurrent({ keepScroll: true });
     } catch (e) {
       console.warn("reload failed (file may have been removed):", e);
     }
@@ -312,35 +243,50 @@ async function boot() {
     showAuxPane: true,
     actions: {
       "open": openViaDialog,
+      "toggle-sidebar": toggleSidebar,
     },
+    customMenu: [
+      { group: "edit", items: [{ label: "Find…", shortcut: "Ctrl+F", action: () => find.open() }] },
+    ],
     updater: true,
   });
-  auxEl = chrome.aux!;
-  auxEl.classList.add("typography-aux");
 
-  // Shell chrome (main-topbar + aux hamburger) comes from desktop-ui's app
-  // layout; we just render into the scroll area it provides.
+  // The app layout (main top bar + aux hamburger strip) comes from
+  // desktop-ui; we just render into the scroll area it provides.
   mainContentEl = chrome.mainContent!;
+  mainContentEl.tabIndex = -1;
   renderRoot = el("article", { class: "render" });
-  mainContentEl.append(renderRoot);
+  placeholderEl = el("div", { class: "placeholder" });
+  mainContentEl.append(renderRoot, placeholderEl);
+  // The contents list scrolls in its own box below the (package-owned)
+  // aux strip, so the hamburger stays put.
+  tocEl = el("div", { class: "toc-list" });
+  chrome.aux!.append(tocEl);
 
-  // Load persisted typography choices, if any. Falls back to defaults
-  // when the file is missing or malformed.
-  try {
-    const loaded = await invoke<Typography>("load_settings");
-    typography = { ...DEFAULTS, ...loaded };
-  } catch (e) {
-    console.warn("load_settings failed:", e);
-  }
-  // An older settings file may name a font we no longer offer (the list
-  // was trimmed to the bundled faces). Fall back to the default so we
-  // never hand applyTypography an empty family string.
-  if (!FONTS.some(f => f.label === typography.headingFont))
-    typography.headingFont = DEFAULTS.headingFont;
-  if (!FONTS.some(f => f.label === typography.bodyFont))
-    typography.bodyFont = DEFAULTS.bodyFont;
-  applyTypography();
-  renderAux();
+  find = installFind({
+    host: chrome.viewport,
+    root: () => renderRoot,
+    scroller: () => mainContentEl,
+  });
+
+  let scrollTick = false;
+  mainContentEl.addEventListener("scroll", () => {
+    if (scrollTick) return;
+    scrollTick = true;
+    requestAnimationFrame(() => {
+      scrollTick = false;
+      updateActiveToc();
+    });
+  }, { passive: true });
+  let rebalanceTimer: number | null = null;
+  new ResizeObserver(() => {
+    if (rebalanceTimer != null) clearTimeout(rebalanceTimer);
+    rebalanceTimer = window.setTimeout(() => {
+      rebalanceTimer = null;
+      if (currentPath) balanceTables(renderRoot);
+    }, 150);
+  }).observe(mainContentEl);
+
   renderEmpty();
 
   // Live re-renders on file change. Path filtering happens here too:

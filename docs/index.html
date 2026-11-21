@@ -1,26 +1,26 @@
 ---
 layout: app
 tagline: a calm live-reload markdown reader for Linux
-description: A quiet markdown reader for Linux. Live file watch, two typography knobs (heading + body), and the rendered output looks like your document — not ours.
+description: A quiet markdown reader for Linux. Live file watch and one carefully set typography.
 og_description: A quiet markdown reader for Linux. Free and open source.
-lede: A markdown reader that watches the file. Edit anywhere — vim, markdown-editor, VS Code — and the render updates the moment you save. Two typography knobs make the output look like your document.
+lede: A markdown reader that watches the file. Edit anywhere — vim, markdown-editor, VS Code — and the render updates the moment you save. One book-like typography, nothing to configure.
 features_heading: Just a reader. A focused one.
 features:
   - tag: Live watch
     title: Saves anywhere, renders here
     blurb: The reader subscribes to the file. Save in any editor and the render updates — no reload, no refresh, no manual sync.
-  - tag: Two knobs
-    title: Heading and body
-    blurb: A curated list of eight serif / sans / mono families and a number for the size. That's it. No CSS panel, no theme picker, no line-height slider.
-  - tag: Curated set
-    title: Eight fonts, no more
-    blurb: Charter, Inter, JetBrains Mono, Georgia, Times New Roman, Helvetica, Arial, system-ui. Headings and body share the same list.
+  - tag: One design
+    title: Set once, set well
+    blurb: Charter at 16px on a 68-character measure, line-height 1.55. No font picker, no size box, no CSS panel.
+  - tag: Contents
+    title: The outline, always there
+    blurb: Headings sit in the side pane. Click to jump; the current one follows as you scroll.
   - tag: GFM
     title: CommonMark + tables
     blurb: Standard markdown with GitHub-flavoured tables, fenced code, task lists. No proprietary syntax, no plugin surface.
   - tag: Quiet chrome
-    title: Calm UI, your document
-    blurb: The krill palette frames the window; the document inside follows whatever typography you picked. The frame is ours, the page is yours.
+    title: Calm UI, calm page
+    blurb: The krill palette frames the window; the document inside is set in one book-like serif. Nothing to tune, nothing to get wrong.
   - tag: Tauri · Rust
     title: Native Linux
     blurb: Small binary, real file associations, no Electron. Opens .md from the file manager like a native app.
@@ -29,11 +29,9 @@ mock:
   chrome: app
 ---
 <style>
-  /* App-layout mock: hamburger + typography aux pane on the left, the
-   * rendered document in the main pane. No titlebar / status line —
-   * mock.chrome: app. The aux mirrors the real sidebar: Heading and
-   * Body font selects with px size boxes, plus "Reset to defaults".
-   * Defaults shown are the app's real ones: Charter 28px / Inter 16px. */
+  /* App-layout mock: hamburger + aux pane on the left (table of
+   * contents), the rendered document in the main pane. No
+   * titlebar — mock.chrome: app. Typography is fixed: Charter throughout. */
   .mv-app {
     display: grid;
     grid-template-columns: 200px 1fr;
@@ -42,69 +40,22 @@ mock:
   }
   .mv-aux {
     border-right: 1px solid var(--rule);
-    background: rgba(var(--ink-rgb), 0.03);
     padding: 10px 14px;
   }
   .mv-burger { color: var(--muted); font-size: 14px; padding: 2px 2px 14px; }
-  .mv-section {
-    font-size: 10.5px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted);
-    margin: 0 0 14px;
-  }
-  .mv-group { margin-bottom: 16px; }
-  .mv-label {
-    font-size: 10.5px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-  .mv-row { display: flex; gap: 6px; }
-  .mv-select {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    height: 28px;
-    padding: 0 9px;
+  .mv-toc { margin: 0 -6px; }
+  .mv-toc div {
+    padding: 4px 6px;
     font-size: 12px;
-    color: var(--ink);
-    background: var(--bg);
-    border: 1px solid var(--rule);
-    border-radius: 6px;
+    line-height: 1.35;
+    color: var(--muted);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .mv-select svg { width: 9px; height: 9px; color: var(--muted); flex: none; }
-  .mv-select.serif { font-family: Charter, Georgia, serif; }
-  .mv-sizebox {
-    display: flex;
-    align-items: baseline;
-    gap: 3px;
-    width: 48px;
-    height: 28px;
-    padding: 5px 8px 0;
-    box-sizing: border-box;
-    font-size: 12px;
-    color: var(--ink);
-    background: var(--bg);
-    border: 1px solid var(--rule);
-    border-radius: 6px;
-    justify-content: flex-end;
-    font-variant-numeric: tabular-nums;
-  }
-  .mv-sizebox .mv-unit { font-size: 10px; color: var(--muted); }
-  .mv-reset {
-    font-size: 11px;
-    color: var(--muted);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
+  .mv-toc .l0 { color: var(--ink); }
+  .mv-toc .l1 { padding-left: 18px; }
+  .mv-toc .on { color: var(--accent); font-weight: 500; }
 
   .mv-main { padding: 10px 24px 22px; }
   .mv-winbtns {
@@ -115,28 +66,26 @@ mock:
     letter-spacing: 2px;
     margin-bottom: 6px;
   }
-  /* The rendered document — content, not chrome. Mirrors the app's real
-   * defaults (heading: Charter, body: Inter), scaled down to mock size. */
+  /* The rendered document — content, not chrome. Mirrors the app's fixed
+   * design (Charter, bold headings), scaled down to mock size. */
   .mv-doc {
     max-width: 58ch;
     margin: 0 auto;
     padding: 6px 8px 12px;
-    font-family: Inter, system-ui, sans-serif;
+    font-family: Charter, Georgia, serif;
     font-size: 13.5px;
-    line-height: 1.6;
+    line-height: 1.55;
     color: var(--ink);
   }
   .mv-doc h1 {
-    font-family: Charter, Georgia, serif;
     font-size: 23px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.2;
     margin: 0 0 10px;
   }
   .mv-doc h2 {
-    font-family: Charter, Georgia, serif;
     font-size: 18px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.2;
     margin: 18px 0 6px;
   }
@@ -158,27 +107,12 @@ mock:
 </style>
 <div class="mv-app">
   <aside class="mv-aux">
-    <div class="mv-burger">☰</div>
-    <h2 class="mv-section">Typography</h2>
-    <div class="mv-group">
-      <div class="mv-label">Heading</div>
-      <div class="mv-row">
-        <span class="mv-select serif">Charter
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </span>
-        <span class="mv-sizebox">28<span class="mv-unit">px</span></span>
-      </div>
+    <div class="mv-burger">◐ ☰</div>
+    <div class="mv-toc">
+      <div class="l0">Sourdough timing</div>
+      <div class="l1 on">The plan</div>
+      <div class="l1">What to remember</div>
     </div>
-    <div class="mv-group">
-      <div class="mv-label">Body</div>
-      <div class="mv-row">
-        <span class="mv-select">Inter
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </span>
-        <span class="mv-sizebox">16<span class="mv-unit">px</span></span>
-      </div>
-    </div>
-    <span class="mv-reset">Reset to defaults</span>
   </aside>
   <div class="mv-main">
     <div class="mv-winbtns">─ ▢ ✕</div>

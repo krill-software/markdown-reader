@@ -2,7 +2,8 @@
  * app layout: in-viewport top bars, hamburger menu, no titlebar / status
  * line) all come from @krill-software/desktop-ui via mountChrome({ layout:
  * "app" }). This file carries only the app's own surfaces: the sidebar
- * typography controls and the rendered-document styling. */
+ * contents list, the rendered-document typography (fixed — one design),
+ * and the find bar. */
 
 /* Fonts (Inter / Charter) are bundled by desktop-ui — see its
  * fonts.css. No local @font-face needed; the family names below resolve to
@@ -25,15 +26,12 @@ body {
 
 /* === App-layout overrides =========================================
  * The top bars, hamburger menu, and grid (no titlebar / status line) all
- * come from desktop-ui's app layout. Only the sidebar tint + the app's own
- * content styling live here. */
+ * come from desktop-ui's app layout. Only the app's own content styling
+ * lives here. */
 
-.typography-aux {
-  background: rgba(48, 52, 63, 0.03) !important;
-  border-right: 0 !important;
-  display: flex;
-  flex-direction: column;
-}
+/* The pane itself never scrolls — the strip with the color-mode toggle
+ * and hamburger stays put; .toc-list below it is the scroll box. */
+#aux { overflow: hidden; }
 
 .main-content {
   flex: 1;
@@ -41,151 +39,28 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  position: relative;
+  outline: none;
 }
 
-/* === Typography controls (sidebar) =============================== */
+:root {
+  /* Document typography — the one design. Charter (Carter, 1987) for
+   * body and headings: drawn to survive low-res output, so it holds up
+   * on a webview canvas at 16px. Line-height 1.55 suits the 68-character
+   * measure. */
+  --doc-font: "Charter", Georgia, "Times New Roman", serif;
+  --doc-size: 16px;
+  --doc-leading: 1.55;
+  --doc-measure: 68ch;
+}
 
-.type-controls {
-  padding: 14px;
+/* Placeholder (empty / error) vs. document: only one is on screen. */
+.main-content[data-state="placeholder"] > .render { display: none; }
+.main-content[data-state="document"] > .placeholder { display: none; }
+.placeholder {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-}
-.type-section {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--fm-muted);
-  margin: 0;
-}
-
-.type-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.type-label {
-  font-size: 11px;
-  color: var(--fm-muted);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* Font + size sit on one row. */
-.type-row {
-  display: flex;
-  gap: 6px;
-  align-items: stretch;
-}
-
-/* Custom-styled <select> — strip the system chevron + system shadow,
- * paint a flat surface that matches the rest of the chrome.
- * Extra padding-right ensures any residual system arrow on webkit2gtk
- * (where appearance:none isn't fully honored) sits *behind* our
- * styled chevron rather than overlapping. */
-.type-select {
-  flex: 1;
-  min-width: 0;
-  height: 32px;
-  padding: 0 32px 0 12px;
-  font: inherit;
-  font-size: 13px;
-  /* Pin line-height so a tall-metric preview font (Charter…)
-   * can't grow the line box past the 32px control and clip the name. */
-  line-height: 1.4;
-  color: var(--fm-text);
-  background-color: var(--fm-bg);
-  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23878472' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 10px;
-  border: 1px solid var(--fm-rule);
-  border-radius: 6px;
-  cursor: pointer;
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  -webkit-tap-highlight-color: transparent;
-  transition:
-    border-color 100ms ease,
-    box-shadow 100ms ease;
-}
-.type-select:hover {
-  border-color: var(--fm-rule-strong);
-}
-/* Focus = subtle accent ring instead of a hard pink border. Quieter
- * indicator, doesn't yell at you while you're picking. */
-.type-select:focus,
-.type-select:focus-visible {
-  border-color: var(--fm-rule-strong);
-  box-shadow: 0 0 0 3px rgba(221, 117, 150, 0.16);
-}
-
-/* Size: compact box with embedded "px" suffix, right of the font select. */
-.type-size-box {
-  display: flex;
-  align-items: center;
-  width: 76px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--fm-rule);
-  border-radius: 6px;
-  background: var(--fm-bg);
-  transition:
-    border-color 100ms ease,
-    box-shadow 100ms ease;
-}
-.type-size-box:hover {
-  border-color: var(--fm-rule-strong);
-}
-.type-size-box:focus-within {
-  border-color: var(--fm-rule-strong);
-  box-shadow: 0 0 0 3px rgba(221, 117, 150, 0.16);
-}
-
-.type-size-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  color: var(--fm-text);
-  text-align: right;
-  font-feature-settings: "tnum" 1;
-  outline: none;
-  padding: 0;
-  -moz-appearance: textfield;
-}
-.type-size-input::-webkit-inner-spin-button,
-.type-size-input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.type-unit {
-  margin-left: 4px;
-  font-size: 11px;
-  color: var(--fm-muted);
-  user-select: none;
-}
-
-.type-reset {
-  align-self: flex-start;
-  padding: 4px 0;
-  font: inherit;
-  font-size: 11.5px;
-  color: var(--fm-muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.type-reset:hover {
-  color: var(--fm-accent);
 }
 
 /* === Empty state ================================================== */
@@ -223,194 +98,333 @@ body {
   font-size: 12px;
 }
 
-/* === Rendered document =========================================== */
+/* === Rendered document ===========================================
+ *
+ * One fixed design, no knobs. The numbers below follow the reading
+ * research rather than taste: 55–75 characters per line (Bringhurst;
+ * Dyson & Haselgrove 2001), leading of ~1.5 for that measure, more
+ * space above a heading than below it so it binds to what follows
+ * (≈2:1), a modest 1.2 modular scale for heading sizes, and paragraph
+ * spacing *or* indents — never both. Serif vs. sans is a wash for
+ * legibility; serif wins on preference for long-form reading, and
+ * Charter is the best-rendering serif we bundle. */
 
 .render {
-  --mv-heading-font: "Charter", Georgia, serif;
-  --mv-body-font: "Inter", system-ui, sans-serif;
-  --mv-heading-size: 28px;
-  --mv-body-size: 16px;
-
-  /* Two widths: a readable prose measure for text, and a wider outer
-   * column that wide blocks (tables, code, images, diagrams) fill so
-   * they aren't crammed. See the prose-cap rule below. */
-  --mv-measure: 78ch;
-
-  max-width: 1000px;
+  max-width: calc(var(--doc-measure) + 2 * 40px);
   margin: 0 auto;
-  padding: 48px 40px 96px;
+  padding: 56px 40px 96px;
   color: var(--fm-text);
-  font-family: var(--mv-body-font);
-  font-size: var(--mv-body-size);
-  line-height: 1.6;
+  font-family: var(--doc-font);
+  font-size: var(--doc-size);
+  line-height: var(--doc-leading);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings:
-    "kern" 1,
-    "liga" 1,
-    "calt" 1;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1, "onum" 0;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: break-word;
 }
 
-/* Keep running text at a comfortable measure even though the column is
- * wide. Tables, code fences, images, rules and diagrams are deliberately
- * left out so they span the full width instead of being crammed. */
-.render > p,
-.render > ul,
-.render > ol,
-.render > blockquote,
-.render > h1,
-.render > h2,
-.render > h3,
-.render > h4,
-.render > h5,
-.render > h6 {
-  max-width: var(--mv-measure);
+/* --- Block rhythm --- */
+.render p,
+.render ul,
+.render ol,
+.render blockquote,
+.render table,
+.render pre,
+.render .mermaid,
+.render hr {
+  margin: 0 0 0.75em;
 }
+.render > :last-child { margin-bottom: 0; }
 
+/* --- Headings: Charter bold, 1.2 scale, tight tracking, ≈2:1 above/below --- */
 .render h1,
 .render h2,
 .render h3,
 .render h4,
 .render h5,
 .render h6 {
-  font-family: var(--mv-heading-font);
+  font-family: var(--doc-font);
+  font-weight: 700;
   color: var(--fm-text);
   line-height: 1.2;
-  margin: 1.6em 0 0.4em;
-  font-weight: 600;
+  letter-spacing: -0.01em;
+  hyphens: none;
+  -webkit-hyphens: none;
+  break-after: avoid;
 }
 .render h1 {
-  font-size: var(--mv-heading-size);
-  margin-top: 0;
+  font-size: 1.75em;          /* 28px */
+  letter-spacing: -0.015em;
+  margin: 0 0 1.2em;
 }
+.render h1:not(:first-child) { margin-top: 2.6em; }
 .render h2 {
-  font-size: calc(var(--mv-heading-size) * 0.78);
+  font-size: 1.4375em;        /* 23px */
+  margin: 3em 0 1em;
 }
 .render h3 {
-  font-size: calc(var(--mv-heading-size) * 0.66);
+  font-size: 1.1875em;        /* 19px */
+  margin: 2.6em 0 0.8em;
 }
 .render h4 {
-  font-size: calc(var(--mv-heading-size) * 0.58);
+  font-size: 1em;
+  margin: 2.4em 0 0.7em;
 }
-.render h5 {
-  font-size: calc(var(--mv-heading-size) * 0.5);
-}
+.render h5,
 .render h6 {
-  font-size: calc(var(--mv-heading-size) * 0.46);
+  /* Small tracked caps: distinct from h4 without another size step. */
+  font-size: 0.8125em;        /* 13px */
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--fm-muted);
+  margin: 2.4em 0 0.7em;
 }
+/* A heading directly after another heading (title + subtitle) sits close. */
+.render :is(h1, h2, h3, h4, h5, h6) + :is(h2, h3, h4, h5, h6) { margin-top: 0.7em; }
+/* Room above a heading when scrolled to from the contents list. */
+.render :is(h1, h2, h3, h4, h5, h6) { scroll-margin-top: 24px; }
+.render > :is(h2, h3, h4, h5, h6):first-child { margin-top: 0; }
 
-.render p,
-.render ul,
-.render ol,
-.render blockquote,
-.render table,
-.render pre {
-  margin: 0 0 1.1em;
-}
-.render ul,
-.render ol {
-  padding-left: 1.4em;
-}
-.render li {
-  margin: 0.2em 0;
-}
-
+/* --- Inline --- */
 .render a {
   color: var(--fm-accent);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: border-color 100ms ease;
 }
-.render a:hover {
-  border-bottom-color: currentColor;
-}
-
-.render blockquote {
-  border-left: 3px solid var(--fm-rule-strong);
-  padding: 0 0 0 1em;
-  color: var(--fm-muted);
-}
-
+.render a:hover { border-bottom-color: currentColor; }
+.render strong { font-weight: 700; }
 .render code {
   font-family: var(--fm-mono);
-  font-size: 0.9em;
+  font-size: 0.875em;
   background: rgba(48, 52, 63, 0.05);
-  padding: 1px 5px;
+  padding: 0.05em 0.35em;
   border-radius: 3px;
 }
+
+/* --- Lists --- */
+.render ul,
+.render ol {
+  padding-left: 1.5em;
+}
+.render li { margin: 0.25em 0; }
+.render li > p { margin-bottom: 0.4em; }
+.render li > ul,
+.render li > ol { margin: 0.25em 0 0; }
+.render ul { list-style: disc; }
+.render ul ul { list-style: circle; }
+.render ::marker { color: var(--fm-muted); }
+
+/* --- Blockquote --- */
+.render blockquote {
+  border-left: 2px solid var(--fm-rule-strong);
+  padding: 0 0 0 1.1em;
+  color: var(--fm-muted);
+}
+.render blockquote > :last-child { margin-bottom: 0; }
+
+/* --- Code blocks --- */
 .render pre {
   background: rgba(48, 52, 63, 0.04);
-  padding: 14px 18px;
+  padding: 0.9em 1.1em;
   border-radius: 6px;
   overflow-x: auto;
-  font-size: 0.88em;
+  font-size: 0.875em;
+  line-height: 1.5;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 .render pre code {
+  font-size: 1em;
   background: transparent;
   padding: 0;
   border-radius: 0;
 }
 
+/* --- Rules --- */
 .render hr {
   border: none;
   border-top: 1px solid var(--fm-rule-strong);
-  margin: 2em 0;
+  margin: 2em auto;
+  width: 8em;
 }
 
+/* --- Tables --- */
 .render table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 0.92em;
+  font-size: 0.9375em;
   line-height: 1.45;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 .render th,
 .render td {
-  padding: 9px 14px;
+  padding: 0.5em 0.75em;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--fm-rule);
 }
+/* Code in cells may wrap (tables.ts adds <wbr> after / . - _ , :) and,
+ * as a last resort, break anywhere rather than force the column wide. */
+.render td code,
+.render th code { white-space: normal; overflow-wrap: anywhere; }
+.render th:first-child,
+.render td:first-child { padding-left: 0; }
+.render th:last-child,
+.render td:last-child { padding-right: 0; }
+/* Header: quiet uppercase labels on a single stronger rule — no band. */
 .render thead th {
+  padding-top: 0;
+  font-size: 0.75em;
   font-weight: 600;
-  color: var(--fm-text);
-  /* Ink at low alpha — a gentle header band, not a new colour. */
-  background: rgba(48, 52, 63, 0.04);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fm-muted);
   border-bottom: 1px solid var(--fm-rule-strong);
 }
-/* Drop the trailing rule so the table doesn't look unfinished. */
-.render tbody tr:last-child td {
-  border-bottom: none;
-}
+/* Markdown tables always carry a header row; when the author left every
+ * cell empty (a key/value table), don't paint an empty band for it. */
+.render thead:not(:has(th:not(:empty))) { display: none; }
+.render tbody tr:last-child td { border-bottom: none; }
 
+/* --- Media --- */
 .render img {
   max-width: 100%;
   height: auto;
 }
+.render .mermaid svg { max-width: 100%; }
 
 .render .front-matter {
   background: rgba(48, 52, 63, 0.04);
-  padding: 12px 16px;
+  padding: 0.75em 1em;
   border-radius: 6px;
-  font-size: 0.8em;
+  font-size: 0.8125em;
   color: var(--fm-muted);
   margin-bottom: 1.6em;
 }
 
-.render .mermaid svg {
-  max-width: 100%;
-}
-
 /* Task lists from markdown-it-task-lists */
 .render ul.contains-task-list {
-  padding-left: 1.4em;
+  padding-left: 1.5em;
   list-style: none;
 }
-.render .task-list-item {
-  display: list-item;
-}
+.render .task-list-item { display: list-item; }
 .render .task-list-item-checkbox {
   margin-right: 8px;
   transform: translateY(1px);
+}
+
+/* === Contents (aux pane) — h1–h3 from the live document ========= */
+.toc-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px 14px;
+}
+.toc-list:empty { display: none; }
+.toc {
+  display: flex;
+  flex-direction: column;
+}
+.toc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px 4px calc(6px + var(--toc-indent, 0px));
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--fm-muted);
+  cursor: pointer;
+}
+.toc-row[data-level="0"] { color: var(--fm-text); }
+.toc-row[data-level="1"] { --toc-indent: 12px; }
+.toc-row[data-level="2"] { --toc-indent: 24px; font-size: 12px; }
+.toc-row:hover { background: var(--fm-rule); color: var(--fm-text); }
+.toc-row[data-active="true"] {
+  color: var(--fm-accent);
+  font-weight: 500;
+}
+.toc-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* === Find ========================================================= */
+
+#viewport { position: relative; }
+.find-bar {
+  position: absolute;
+  top: 44px;
+  right: 20px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 10px;
+  background: var(--fm-bg);
+  border: 1px solid var(--fm-rule-strong);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(48, 52, 63, 0.16);
+}
+.find-bar[hidden] { display: none; }
+.find-input {
+  width: 200px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--fm-text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.find-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.find-count {
+  min-width: 5ch;
+  font-family: var(--fm-mono);
+  font-size: 11px;
+  color: var(--fm-muted);
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 4px;
+}
+.find-count[data-empty="true"] { color: var(--fm-accent); }
+.find-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fm-muted);
+  cursor: pointer;
+}
+.find-btn:hover { background: var(--fm-rule); color: var(--fm-text); }
+
+mark.find-hit {
+  background: rgba(221, 117, 150, 0.28);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0;
+}
+mark.find-hit[data-current="true"] {
+  background: var(--fm-accent);
+  color: var(--fm-bg);
 }

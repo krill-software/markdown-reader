@@ -1,4 +1,3 @@
-mod settings;
 mod watch;
 
 use std::path::PathBuf;
@@ -45,16 +44,6 @@ async fn watch_file(
 }
 
 #[tauri::command]
-fn load_settings() -> settings::Settings {
-    settings::load()
-}
-
-#[tauri::command]
-fn save_settings(settings: settings::Settings) -> Result<(), String> {
-    settings::save(&settings).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
 async fn stop_watching(state: State<'_, Arc<AppCtx>>) -> Result<(), String> {
     *state.watch.lock().await = None;
     Ok(())
@@ -87,8 +76,6 @@ pub fn run() {
             absolute_path,
             watch_file,
             stop_watching,
-            load_settings,
-            save_settings,
             dev_test_file,
         ])
         .run(tauri::generate_context!())

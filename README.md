@@ -1,25 +1,23 @@
 # Markdown Reader
 
-> A markdown reader with live file watch and the two typography knobs
-> the rendered document needs to feel like yours.
+> A markdown reader with live file watch and one carefully set
+> typography.
 
 Part of the [krill](https://krill.software) umbrella of small, calm,
 single-purpose Linux apps. See [SPEC.md](SPEC.md) for the full design.
 
 ## Why split it off from markdown-editor
 
-The editor is an **authoring** surface — typography there is locked
-on purpose. Calmness while writing is the point. But the **rendered
-output** is your artifact, not ours; you should be able to pick the
-typography it gets rendered with. Splitting solves both: editor stays
-opinionated, reader carries the four knobs (heading font + size, body
-font + size) and nothing else.
+The editor is an **authoring** surface — muted syntax look, locked on
+purpose, calm while writing. The **rendered output** wants a reading
+typography instead: a book-like serif at a comfortable measure.
+Splitting keeps both opinionated
+without either becoming a settings panel.
 
 ## Status
 
-Pre-v1. M1: open a `.md`, render it, change typography from the
-sidebar. M2 (file watching for live updates) and M3 (persisted font
-choices) are next.
+Open a `.md` (CLI arg, dialog, drag-drop), live-reload on save, find
+in document, contents list in the sidebar.
 
 ## License
 
